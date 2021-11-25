@@ -34,7 +34,8 @@ void ofApp::setup(){
     settings.numBuffers = 4;
 
     stream.setup(settings);
-    std::cout << "done setting up stream" << std::endl;
+
+    aboveThreshold = false;
 }
 
 //--------------------------------------------------------------
@@ -55,11 +56,25 @@ void ofApp::update() {
 //--------------------------------------------------------------
 void ofApp::draw(){
     ofDrawBitmapString("Scaled average vol (0-100): " + ofToString(scaledVol * 100.0, 0), 4, 18);
+
+    if (scaledVol >= 0.5 && !aboveThreshold) {
+        gateTrigger();
+        aboveThreshold = true;
+    } else if (scaledVol < 0.5 && aboveThreshold) {
+        aboveThreshold = false;
+    }
+
     float size = scaledVol * 190.0f;
 
     // once per frame, second
     ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
     ofDrawRectangle(-size / 2, -size / 2, size, size);
+}
+
+//--------------------------------------------------------------
+void ofApp::gateTrigger() {
+    std::cout << "cycling color" << std::endl;
+    ofSetColor( ofColor(ofRandom(100, 255), ofRandom(100, 255), ofRandom(100, 255)) );
 }
 
 //--------------------------------------------------------------
