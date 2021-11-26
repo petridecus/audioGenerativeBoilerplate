@@ -10,12 +10,18 @@ void ofApp::setup(){
 
     left.assign(bufferSize, 0.0);
     right.assign(bufferSize, 0.0);
-    volHistory.assign(400, 0.0);
+
+    volHistoryLeft.assign(400, 0.0);
+    volHistoryRight.assign(400, 0.0);
 
     bufferCounter = 0;
     drawCounter = 0;
-    smoothedVol = 0.0;
-    scaledVol = 0.0;
+
+    smoothedVolLeft = 0.0;
+    smoothedVolRight = 0.0;
+
+    scaledVolLeft = 0.0;
+    scaledVolRight = 0.0;
 
     // AUDIO
     auto devices = stream.getDeviceList(ofSoundDevice::ALSA);
@@ -40,35 +46,44 @@ void ofApp::setup(){
 
 //--------------------------------------------------------------
 void ofApp::update() {
-    // once per frame, first
-	//lets scale the vol up to a 0-1 range
-	scaledVol = ofMap(smoothedVol, 0.0, 0.17, 0.0, 1.0, true);
+    // scale vols up to a 0-1 range
+    scaledVolLeft = ofMap(smoothedVolLeft, 0.0, 0.17, 0.0, 1.0, true);
+    scaledVolRight = ofMap(smoothedVolRight, 0.0, 0.17, 0.0, 1.0, true);
 
-	//lets record the volume into an array
-	volHistory.push_back( scaledVol );
+    //lets record the volume into an array
+    volHistoryLeft.push_back( scaledVolLeft );
+    volHistoryRight.push_back( scaledVolRight );
 
-	//if we are bigger the the size we want to record - lets drop the oldest value
-	if( volHistory.size() >= 400 ){
-		volHistory.erase(volHistory.begin(), volHistory.begin()+1);
-	}
+    // drop oldest values in each stereo channel's buffer
+    if( volHistoryLeft.size() >= 400 ){
+        volHistoryLeft.erase(volHistoryLeft.begin(), volHistoryLeft.begin()+1);
+    }
+    if( volHistoryRight.size() >= 400 ){
+        volHistoryRight.erase(volHistoryRight.begin(), volHistoryRight.begin()+1);
+    }
 }
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-    ofDrawBitmapString("Scaled average vol (0-100): " + ofToString(scaledVol * 100.0, 0), 4, 18);
+    ofDrawBitmapString("Left: " + ofToString(scaledVolLeft * 100.0, 0), 4, 18);
+    ofDrawBitmapString("Right: " + ofToString(scaledVolRight * 100.0, 0), 4, 48);
 
-    if (scaledVol >= 0.5 && !aboveThreshold) {
+    if (scaledVolLeft >= 0.5 && !aboveThreshold) {
         gateTrigger();
         aboveThreshold = true;
-    } else if (scaledVol < 0.5 && aboveThreshold) {
+    } else if (scaledVolLeft < 0.5 && aboveThreshold) {
         aboveThreshold = false;
     }
 
-    float size = scaledVol * 190.0f;
+    float sizeLeft = scaledVolLeft * 190.0f;
+    float sizeRight = scaledVolRight * 190.0f;
 
     // once per frame, second
-    ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
-    ofDrawRectangle(-size / 2, -size / 2, size, size);
+    ofTranslate(ofGetWidth() / 3, ofGetHeight() / 2);
+    ofDrawRectangle(-sizeLeft / 2, -sizeLeft / 2, sizeLeft, sizeLeft);
+
+    ofTranslate(ofGetWidth() / 3, 0);
+    ofDrawRectangle(-sizeRight / 2, -sizeRight / 2, sizeRight, sizeRight);
 }
 
 //--------------------------------------------------------------
@@ -79,33 +94,36 @@ void ofApp::gateTrigger() {
 
 //--------------------------------------------------------------
 void ofApp::audioIn(ofSoundBuffer &input) {
-    // std::cout << "in audioIn callback function!" << std::endl;
-
-    float curVol = 0.0;
+    float curVolLeft = 0.0;
+    float curVolRight = 0.0;
 
     // samples are "interleaved"
     int numCounted = 0;
 
     //lets go through each sample and calculate the root mean square which is a rough way to calculate volume
-    for (size_t i = 0; i < input.getNumFrames(); i++){
-        // std::cout << input[i] << std::endl;
+    for (size_t ii = 0; ii < input.getNumFrames(); ++ii){
+        left[ii] = input[ii*2]*0.5;
+        right[ii] = input[ii*2+1]*0.5;
 
-        left[i] = input[i*2]*0.5;
-        right[i] = input[i*2+1]*0.5;
+        curVolLeft += left[ii] * left[ii];
+        curVolRight += right[ii] * right[ii];
 
-        curVol += left[i] * left[i];
-        curVol += right[i] * right[i];
-        numCounted+=2;
+        ++numCounted;
     }
 
     //this is how we get the mean of rms :)
-    curVol /= (float)numCounted;
+    curVolLeft /= (float)numCounted;
+    curVolRight /= (float)numCounted;
 
     // this is how we get the root of rms :)
-    curVol = sqrt( curVol );
+    curVolLeft = sqrt( curVolLeft );
+    curVolRight = sqrt( curVolRight );
 
-    smoothedVol *= 0.93;
-    smoothedVol += 0.07 * curVol;
+    smoothedVolLeft *= 0.93;
+    smoothedVolRight *= 0.93;
+
+    smoothedVolLeft += 0.07 * curVolLeft;
+    smoothedVolRight += 0.07 * curVolRight;
 
     bufferCounter++;
 }

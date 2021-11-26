@@ -19,13 +19,18 @@ class ofApp : public ofBaseApp{
 
 		vector <float> left;
 		vector <float> right;
-		vector <float> volHistory;
+
+		vector <float> volHistoryLeft;
+		vector <float> volHistoryRight;
 
 		int bufferCounter;
 		int drawCounter;
 
-		float smoothedVol;
-		float scaledVol;
+		float smoothedVolLeft;
+		float smoothedVolRight;
+
+		float scaledVolLeft;
+		float scaledVolRight;
 
 		ofSoundStream stream;
 		ofSoundStreamSettings settings;
