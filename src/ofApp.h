@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofMain.h"
+#include "ofxFBX.h"
 
 class ofApp : public ofBaseApp{
 
@@ -36,4 +37,18 @@ class ofApp : public ofBaseApp{
 		ofSoundStreamSettings settings;
 
 		bool aboveThreshold;
+
+		ofSpherePrimitive sphere;
+		ofLight light;
+		ofTexture noiseTexture;
+		ofTexture grungeTexture;
+		ofEasyCam cam;
+
+		ofColor sphereColor;
+
+		ofxFBX fbx;
+
+		bool bRenderNormals = false;
+		bool bRenderMeshes = true;
+		bool bDrawBones = false;
 };

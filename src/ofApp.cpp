@@ -2,10 +2,35 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-    ofSetVerticalSync(true);
-    ofSetCircleResolution(80);
-    ofBackground(54, 54, 54);
+    // FBX SETUP
+    ofxFBXSource::Scene::Settings fbxSettings;
+    fbxSettings.filePath = "astroBoy_walk.fbx";
 
+    fbxSettings.printInfo = true;
+
+    ofSetLogLevel(OF_LOG_VERBOSE);
+
+    if(fbx.load(fbxSettings)) {
+        cout << "loaded the scene" << endl;
+    } else {
+        cout << "error loading the scene" << endl;
+    }
+
+    fbx.setAnimation(0);
+    fbx.setPosition(0, -7, 0);
+
+    // VIDEO
+    ofDisableAlphaBlending();
+    ofEnableDepthTest();
+    ofDisableArbTex();
+
+    ofLoadImage(noiseTexture, "noise_texture.png");
+    ofLoadImage(grungeTexture, "grunge_texture.png");
+
+    cam.setDistance(50);
+    sphereColor = ofColor(255, 255, 255);
+
+    // AUDIO
     int bufferSize = 256;
 
     left.assign(bufferSize, 0.0);
@@ -23,7 +48,6 @@ void ofApp::setup(){
     scaledVolLeft = 0.0;
     scaledVolRight = 0.0;
 
-    // AUDIO
     auto devices = stream.getDeviceList(ofSoundDevice::ALSA);
     stream.printDeviceList();
 
@@ -42,6 +66,9 @@ void ofApp::setup(){
     stream.setup(settings);
 
     aboveThreshold = false;
+    bRenderNormals  = false;
+    bRenderMeshes   = true;
+    bDrawBones      = false;
 }
 
 //--------------------------------------------------------------
@@ -61,12 +88,31 @@ void ofApp::update() {
     if( volHistoryRight.size() >= 400 ){
         volHistoryRight.erase(volHistoryRight.begin(), volHistoryRight.begin()+1);
     }
+
+    light.setPosition( cos(ofGetElapsedTimef()*2.) * 7, 4 + sin( ofGetElapsedTimef() ) * 2.5, 10  );
+
+    ofVec3f target( ofMap( ofGetMouseX(), 0, ofGetWidth(), -10, 10, true), fbx.getPosition().y, fbx.getPosition().z+10 );
+    fbx.lookAt( target );
+    fbx.panDeg( 180 );
+
+    fbx.getCurrentAnimation().setSpeed( ofMap( scaledVolRight, 0, 1, 0.5, 2.5, true ));
+
+    // moves the bones into place based on the animation //
+    fbx.earlyUpdate();
+
+    // perform any bone manipulation here //
+    shared_ptr<ofxFBXBone> bone = fbx.getBone("head");
+    if( bone ) {
+        bone->pointTo( light.getPosition(), ofVec3f(-1,0,0) ) ;
+    }
+
+    // manipulates the mesh around the positioned bones //
+    fbx.lateUpdate();
 }
 
 //--------------------------------------------------------------
 void ofApp::draw(){
-    ofDrawBitmapString("Left: " + ofToString(scaledVolLeft * 100.0, 0), 4, 18);
-    ofDrawBitmapString("Right: " + ofToString(scaledVolRight * 100.0, 0), 4, 48);
+    cam.begin();
 
     if (scaledVolLeft >= 0.5 && !aboveThreshold) {
         gateTrigger();
@@ -75,21 +121,32 @@ void ofApp::draw(){
         aboveThreshold = false;
     }
 
-    float sizeLeft = scaledVolLeft * 190.0f;
-    float sizeRight = scaledVolRight * 190.0f;
+    if( bRenderMeshes ) {
+        ofSetColor( 255, 255, 255 );
+        fbx.draw();
+    }
 
-    // once per frame, second
-    ofTranslate(ofGetWidth() / 3, ofGetHeight() / 2);
-    ofDrawRectangle(-sizeLeft / 2, -sizeLeft / 2, sizeLeft, sizeLeft);
+    if(bDrawBones) {
+        fbx.drawSkeletons( 0.5 );
+    }
 
-    ofTranslate(ofGetWidth() / 3, 0);
-    ofDrawRectangle(-sizeRight / 2, -sizeRight / 2, sizeRight, sizeRight);
+    if( bRenderNormals ) {
+        ofSetColor( 255, 0, 255 );
+        fbx.drawMeshNormals( 0.5, false );
+    }
+
+    ofSetColor( sphereColor );
+    noiseTexture.bind();
+    ofDrawSphere( light.getPosition(), 5 * scaledVolLeft );
+    noiseTexture.unbind();
+
+    cam.end();
 }
 
 //--------------------------------------------------------------
 void ofApp::gateTrigger() {
     std::cout << "cycling color" << std::endl;
-    ofSetColor( ofColor(ofRandom(100, 255), ofRandom(100, 255), ofRandom(100, 255)) );
+    sphereColor = ofColor(ofRandom(100, 255), ofRandom(100, 255), ofRandom(100, 255));
 }
 
 //--------------------------------------------------------------
